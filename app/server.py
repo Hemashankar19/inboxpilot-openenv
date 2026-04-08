@@ -1,25 +1,26 @@
 """FastAPI server exposing the OpenEnv HTTP interface."""
-from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Optional
 import app.env as env
 
 app = FastAPI(title="InboxPilot-OpenEnv", version="1.0.0")
 
 
-class ResetRequest(BaseModel):
-    task_id: str = "easy"
+from typing import Optional
 
+class ResetRequest(BaseModel):
+    task_id: Optional[str] = "easy"
 class StepRequest(BaseModel):
     action: dict[str, Any]
 
 
 @app.post("/reset")
-def reset(req: ResetRequest):
+def reset(req: Optional[ResetRequest] = None):
+    if req is None:
+        req = ResetRequest()
     obs = env.reset(req.task_id)
     return obs.model_dump()
-
 
 @app.post("/step")
 def step(req: StepRequest):
