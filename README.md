@@ -1,3 +1,13 @@
+---
+title: InboxPilot OpenEnv
+emoji: 📬
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # InboxPilot-OpenEnv
 
 **A real-world email triage and response drafting environment for the Meta PyTorch OpenEnv Hackathon.**
