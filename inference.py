@@ -14,6 +14,7 @@ load_dotenv()
 ENV_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:7860")
 MODEL_NAME   = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 OPENAI_KEY   = os.environ.get("OPENAI_API_KEY", "")
+HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 MAX_STEPS    = int(os.environ.get("MAX_STEPS", "30"))
 
 # 🔴 DISABLE OpenAI (force Ollama usage)
