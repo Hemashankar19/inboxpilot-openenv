@@ -1,0 +1,70 @@
+{
+  "task_id": "medium",
+  "goal": "Handle a portal access issue affecting a student before their placement deadline. Classify, prioritize, route, and draft a compliant, empathetic reply.",
+  "max_steps": 20,
+  "soft_step_budget": 12,
+  "emails": [
+    {
+      "id": "email_002",
+      "subject": "Cannot access certificate portal - placement deadline tomorrow!",
+      "sender": "priya.sharma@student.edu",
+      "sender_domain": "student.edu",
+      "body": "Hello,\n\nI am unable to log into the certificate download portal since yesterday. I keep getting 'Error 503'. My placement interview is tomorrow and I need this certificate urgently. My registered email is priya.sharma@student.edu and student ID is STU-7782.\n\nPlease help ASAP.\n\nPriya Sharma",
+      "has_attachment": false
+    }
+  ],
+  "gold": [
+    {
+      "email_id": "email_002",
+      "category": "support",
+      "priority": "high",
+      "route": "tech_support",
+      "required_fields": {
+        "student_id": "STU-7782",
+        "error_code": "503"
+      },
+      "reply_requirements": {
+        "required_groups": [
+          [
+            "sorry",
+            "understand",
+            "apologize",
+            "apologies"
+          ],
+          [
+            "portal",
+            "certificate",
+            "access"
+          ],
+          [
+            "please share",
+            "provide",
+            "send us",
+            "attach",
+            "screenshot"
+          ],
+          [
+            "tech support",
+            "technical team",
+            "support team",
+            "our team"
+          ]
+        ],
+        "forbidden_phrases": [
+          "guaranteed within",
+          "will definitely fix",
+          "instantly",
+          "immediately resolved"
+        ],
+        "required_ids": []
+      }
+    }
+  ],
+  "grader_weights": {
+    "classification": 0.2,
+    "priority": 0.15,
+    "routing": 0.25,
+    "extraction": 0.15,
+    "reply": 0.25
+  }
+}

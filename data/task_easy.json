@@ -1,0 +1,36 @@
+{
+  "task_id": "easy",
+  "goal": "Classify, prioritize, extract key fields, and route the single email to the correct internal queue. Then mark it resolved and finish.",
+  "max_steps": 15,
+  "soft_step_budget": 8,
+  "emails": [
+    {
+      "id": "email_001",
+      "subject": "Double charge on my account - urgent",
+      "sender": "rahul.kumar@student.edu",
+      "sender_domain": "student.edu",
+      "body": "Hi,\n\nI was charged twice for my semester fee. Both transactions show on my bank statement. Transaction IDs: TXN-2024-88341 and TXN-2024-88342. Please refund one immediately. My student ID is STU-4421.\n\nRegards,\nRahul",
+      "has_attachment": false
+    }
+  ],
+  "gold": [
+    {
+      "email_id": "email_001",
+      "category": "finance",
+      "priority": "high",
+      "route": "finance_office",
+      "required_fields": {
+        "transaction_id": "TXN-2024-88341",
+        "student_id": "STU-4421"
+      },
+      "reply_requirements": null
+    }
+  ],
+  "grader_weights": {
+    "classification": 0.25,
+    "priority": 0.2,
+    "routing": 0.3,
+    "extraction": 0.25,
+    "reply": 0.0
+  }
+}

@@ -1,0 +1,46 @@
+name: InboxPilot-OpenEnv
+version: "1.0.0"
+description: >
+  A real-world email triage and response drafting environment.
+  An AI agent inspects a shared operations inbox, classifies emails,
+  assigns priority, extracts key fields, routes to internal queues,
+  and optionally drafts compliant replies.
+
+tasks:
+  - id: easy
+    description: Single-email classification, priority, field extraction, and routing.
+    max_steps: 15
+    difficulty: easy
+  - id: medium
+    description: Triage + constrained reply draft for a portal access issue.
+    max_steps: 20
+    difficulty: medium
+  - id: hard
+    description: Multi-email inbox with phishing, spam, duplicates, and step budget pressure.
+    max_steps: 35
+    difficulty: hard
+
+actions:
+  - SelectEmail
+  - ClassifyEmail
+  - SetPriority
+  - ExtractFields
+  - RouteEmail
+  - DraftReply
+  - MarkResolved
+  - RequestMoreInfo
+  - FinishEpisode
+
+endpoints:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+
+reward:
+  type: shaped
+  range: [-1.0, 1.0]
+  final_score_range: [0.0, 1.0]
+
+runtime:
+  port: 7860
+  sdk: docker

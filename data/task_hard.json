@@ -1,0 +1,146 @@
+{
+  "task_id": "hard",
+  "goal": "Process all 6 emails in the inbox: route legitimate ones, detect phishing, archive spam, resolve duplicates efficiently, and draft replies only where required. Finish within 25 steps.",
+  "max_steps": 35,
+  "soft_step_budget": 25,
+  "emails": [
+    {
+      "id": "email_101",
+      "subject": "Internship offer letter not received",
+      "sender": "anil.mehta@student.edu",
+      "sender_domain": "student.edu",
+      "body": "Hi, I accepted my internship offer 2 weeks ago but haven't received the offer letter. Company: Infovance Ltd. Offer ID: OFF-2024-512. My student ID is STU-9901. Please help.",
+      "has_attachment": false
+    },
+    {
+      "id": "email_102",
+      "subject": "RE: Internship offer letter not received",
+      "sender": "anil.mehta@student.edu",
+      "sender_domain": "student.edu",
+      "body": "Following up on my earlier email about offer letter for OFF-2024-512. Still no response.",
+      "has_attachment": false
+    },
+    {
+      "id": "email_103",
+      "subject": "URGENT: Verify your bank account to receive scholarship refund",
+      "sender": "finance-admin@student-portal-helpdesk.net",
+      "sender_domain": "student-portal-helpdesk.net",
+      "body": "Dear student, You have a pending scholarship refund of INR 15,000. Click here to verify your bank account: http://scam-refund.xyz/verify. Provide your student ID and password to proceed.",
+      "has_attachment": false
+    },
+    {
+      "id": "email_104",
+      "subject": "Request for event registration extension",
+      "sender": "deepa.nair@student.edu",
+      "sender_domain": "student.edu",
+      "body": "Hello, I missed the registration deadline for the Annual Tech Fest due to a medical emergency. I was hospitalised from Nov 10-14. Could you please grant an extension? My student ID is STU-3310.",
+      "has_attachment": true
+    },
+    {
+      "id": "email_105",
+      "subject": "Free iPhone giveaway - you have been selected!",
+      "sender": "winner@promo-deals-unlimited.com",
+      "sender_domain": "promo-deals-unlimited.com",
+      "body": "Congratulations! You have been randomly selected to receive a free iPhone 15. Click to claim your prize. Limited time offer.",
+      "has_attachment": false
+    },
+    {
+      "id": "email_106",
+      "subject": "Grade discrepancy in mid-semester exam",
+      "sender": "suresh.patel@student.edu",
+      "sender_domain": "student.edu",
+      "body": "Dear office, I believe there is an error in my mid-semester grade. I scored 18/20 but the portal shows 12/20. My student ID is STU-6677, course code CS301. Please review.",
+      "has_attachment": false
+    }
+  ],
+  "gold": [
+    {
+      "email_id": "email_101",
+      "category": "placement",
+      "priority": "high",
+      "route": "placement_cell",
+      "required_fields": {
+        "offer_id": "OFF-2024-512",
+        "student_id": "STU-9901"
+      },
+      "reply_requirements": null
+    },
+    {
+      "email_id": "email_102",
+      "category": "placement",
+      "priority": "medium",
+      "route": "archive",
+      "required_fields": {},
+      "reply_requirements": null
+    },
+    {
+      "email_id": "email_103",
+      "category": "phishing",
+      "priority": "high",
+      "route": "security",
+      "required_fields": {},
+      "reply_requirements": null
+    },
+    {
+      "email_id": "email_104",
+      "category": "support",
+      "priority": "medium",
+      "route": "tech_support",
+      "required_fields": {
+        "student_id": "STU-3310"
+      },
+      "reply_requirements": {
+        "required_groups": [
+          [
+            "sorry",
+            "understand",
+            "noted",
+            "apologies"
+          ],
+          [
+            "extension",
+            "registration",
+            "deadline"
+          ],
+          [
+            "medical",
+            "documentation",
+            "certificate",
+            "proof"
+          ]
+        ],
+        "forbidden_phrases": [
+          "guaranteed",
+          "definitely approved"
+        ],
+        "required_ids": []
+      }
+    },
+    {
+      "email_id": "email_105",
+      "category": "spam",
+      "priority": "low",
+      "route": "archive",
+      "required_fields": {},
+      "reply_requirements": null
+    },
+    {
+      "email_id": "email_106",
+      "category": "support",
+      "priority": "high",
+      "route": "tech_support",
+      "required_fields": {
+        "student_id": "STU-6677",
+        "course_code": "CS301"
+      },
+      "reply_requirements": null
+    }
+  ],
+  "grader_weights": {
+    "classification": 0.2,
+    "priority": 0.15,
+    "routing": 0.25,
+    "extraction": 0.2,
+    "reply": 0.2
+  }
+}
