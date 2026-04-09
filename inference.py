@@ -17,7 +17,7 @@ OPENAI_KEY   = os.environ.get("OPENAI_API_KEY", "")
 HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 MAX_STEPS    = int(os.environ.get("MAX_STEPS", "30"))
 
-# 🔴 DISABLE OpenAI (force Ollama usage)
+#  DISABLE OpenAI (force Ollama usage)
 client = None
 
 SYSTEM_PROMPT = """You are an expert inbox triage agent for a university operations team.
@@ -51,16 +51,20 @@ Return ONLY valid JSON. No explanation.
 
 def call_env(method: str, path: str, body: dict | None = None) -> dict:
     url = f"{ENV_BASE_URL}{path}"
-    with httpx.Client(timeout=30) as c:
-        if method == "POST":
-            r = c.post(url, json=body)
-        else:
-            r = c.get(url)
-    r.raise_for_status()
-    return r.json()
+    try:
+        with httpx.Client(timeout=60) as c:
+            if method == "POST":
+                r = c.post(url, json=body)
+            else:
+                r = c.get(url)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"[ERROR] call_env failed for {path}: {e}")
+        return {}
 
 
-# ✅ 🔥 OLLAMA VERSION (ONLY CHANGE HERE)
+#  OLLAMA VERSION (ONLY CHANGE HERE)
 def choose_action(obs: dict, history: list[dict]) -> dict:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for h in history[-10:]:
