@@ -7,8 +7,6 @@ from typing import Any
 from app.models import EmailMessage, EpisodeState
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
-
 def _has_phrase_from_group(text: str, group: list[str]) -> bool:
     t = (text or "").lower()
     return any(p.lower() in t for p in group)
@@ -19,30 +17,19 @@ def _extract_id_from_text(text: str, pattern: str) -> bool:
 
 
 def _clamp_open_unit(x: float) -> float:
-    """
-    Clamp score strictly into (0, 1), never allowing exact 0.0 or 1.0.
-    """
     if x <= 0.0:
         return 0.01
     if x >= 1.0:
         return 0.99
-    return round(x, 4)
+    return round(float(x), 4)
 
 
-# ── reply grader (rule-based semantic templates) ──────────────────────────────
-
-def grade_reply(reply: str, requirements: dict) -> float:
-    """
-    requirements keys (all optional):
-      required_groups: list[list[str]]  — at least one phrase per group must appear
-      forbidden_phrases: list[str]
-      required_ids: list[str]  — regex patterns that must match
-    Returns score strictly in (0, 1).
-    """
+def grade_reply(reply: str, requirements: dict[str, Any]) -> float:
     if not reply:
         return 0.01
 
     score = 1.0
+
     groups = requirements.get("required_groups", [])
     if groups:
         per_group = 1.0 / len(groups)
@@ -62,10 +49,7 @@ def grade_reply(reply: str, requirements: dict) -> float:
     return _clamp_open_unit(score)
 
 
-# ── per-email grader ──────────────────────────────────────────────────────────
-
 def grade_email(email: EmailMessage, gold: dict[str, Any]) -> dict[str, float]:
-    """Grade a single email against gold standard. Returns component scores."""
     result: dict[str, float] = {
         "classification": 0.0,
         "priority": 0.0,
@@ -99,23 +83,15 @@ def grade_email(email: EmailMessage, gold: dict[str, Any]) -> dict[str, float]:
     return result
 
 
-# ── task-level graders ────────────────────────────────────────────────────────
-
 def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
-    """
-    Master grader. Returns a normalised score strictly in (0, 1).
-    task_data["gold"] is a list of gold objects, one per email.
-    """
-    gold_map: dict[str, dict[str, Any]] = {
-        g["email_id"]: g for g in task_data.get("gold", []) if "email_id" in g
-    }
-    email_map: dict[str, EmailMessage] = {e.id: e for e in state.emails}
-
-    if not gold_map:
+    gold_items = task_data.get("gold", [])
+    if not isinstance(gold_items, list) or not gold_items:
         return 0.5
 
-    total_possible = 0.0
-    total_earned = 0.0
+    gold_map: dict[str, dict[str, Any]] = {
+        g["email_id"]: g for g in gold_items if isinstance(g, dict) and "email_id" in g
+    }
+    email_map: dict[str, EmailMessage] = {e.id: e for e in state.emails}
 
     weights = task_data.get(
         "grader_weights",
@@ -128,6 +104,9 @@ def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
         },
     )
 
+    total_possible = 0.0
+    total_earned = 0.0
+
     for email_id, gold in gold_map.items():
         email = email_map.get(email_id)
         if email is None:
@@ -135,38 +114,27 @@ def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
 
         scores = grade_email(email, gold)
 
-        active = {
-            k
-            for k in weights
-            if gold.get(_gold_key(k)) is not None or k in ("extraction", "reply")
-        }
-
-        if not gold.get("reply_requirements"):
-            active.discard("reply")
-        if not gold.get("required_fields"):
-            active.discard("extraction")
+        active = set()
+        if gold.get("category") is not None:
+            active.add("classification")
+        if gold.get("priority") is not None:
+            active.add("priority")
+        if gold.get("route") is not None:
+            active.add("routing")
+        if gold.get("required_fields"):
+            active.add("extraction")
+        if gold.get("reply_requirements"):
+            active.add("reply")
 
         for dim in active:
             w = float(weights.get(dim, 0.0))
             total_possible += w
             total_earned += w * float(scores.get(dim, 0.0))
 
-    if total_possible == 0:
-        raw = 0.5
-    else:
-        raw = total_earned / total_possible
+    raw = 0.5 if total_possible == 0 else (total_earned / total_possible)
 
     soft_budget = task_data.get("soft_step_budget", state.max_steps)
     over = max(0, state.step - soft_budget)
     penalty = min(over * 0.01, 0.10)
 
-    final_score = raw - penalty
-    return _clamp_open_unit(final_score)
-
-
-def _gold_key(dim: str) -> str:
-    return {
-        "classification": "category",
-        "priority": "priority",
-        "routing": "route",
-    }.get(dim, dim)
+    return _clamp_open_unit(raw - penalty)
