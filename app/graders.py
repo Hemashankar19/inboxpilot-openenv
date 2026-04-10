@@ -17,13 +17,13 @@ def _extract_id_from_text(text: str, pattern: str) -> bool:
 
 
 def _safe_score(raw: float) -> float:
-    """Guarantee (0.01, 0.99) regardless of input."""
+    """Guarantee a score strictly inside (0, 1)."""
     x = float(raw)
     if x <= 0.0:
         return 0.01
     if x >= 1.0:
         return 0.99
-    return round(x, 2)  # Whole numbers like 0.25, 0.50, 0.75
+    return round(x, 2)
 
 
 def grade_reply(reply: str, requirements: dict[str, Any]) -> float:
@@ -86,7 +86,6 @@ def grade_email(email: EmailMessage, gold: dict[str, Any]) -> dict[str, float]:
 
 
 def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
-    # Always return safe score, even on edge cases
     try:
         gold_items = task_data.get("gold", [])
         if not isinstance(gold_items, list) or len(gold_items) == 0:
@@ -141,13 +140,12 @@ def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
 
         raw = total_earned / total_possible
 
-        soft_budget = task_data.get("soft_step_budget", getattr(state, 'max_steps', 30))
-        over = max(0, getattr(state, 'step', 0) - soft_budget)
+        soft_budget = task_data.get("soft_step_budget", getattr(state, "max_steps", 30))
+        over = max(0, getattr(state, "step", 0) - soft_budget)
         penalty = min(over * 0.01, 0.10)
 
         final = raw - penalty
         return _safe_score(final)
 
     except Exception:
-        # Validator safety net - never crash, always return safe score
         return 0.50
