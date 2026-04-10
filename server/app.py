@@ -91,7 +91,7 @@ def get_state():
 
 @app.get("/tasks")
 def list_tasks():
-    return {"tasks": _list_tasks()}
+    return _list_tasks()
 
 
 @app.get("/health")
