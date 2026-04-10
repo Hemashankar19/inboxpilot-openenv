@@ -1,30 +1,57 @@
 """Core InboxPilot environment."""
 from __future__ import annotations
-import copy, uuid
-from typing import Any, Optional
+
+import uuid
+from typing import Optional
+
 from app.models import (
-    EpisodeState, EmailMessage, Observation, InboxSummary,
-    EmailPreview, RewardBreakdown,
-    SelectEmail, ClassifyEmail, SetPriority, ExtractFields,
-    RouteEmail, DraftReply, MarkResolved, RequestMoreInfo, FinishEpisode,
+    EpisodeState,
+    EmailMessage,
+    Observation,
+    InboxSummary,
+    EmailPreview,
+    SelectEmail,
+    ClassifyEmail,
+    SetPriority,
+    ExtractFields,
+    RouteEmail,
+    DraftReply,
+    MarkResolved,
+    RequestMoreInfo,
+    FinishEpisode,
 )
 from app.tasks import load_task
 from app.reward import compute_step_reward
 from app.graders import grade_task
 
 AVAILABLE_ACTIONS = [
-    "SelectEmail", "ClassifyEmail", "SetPriority", "ExtractFields",
-    "RouteEmail", "DraftReply", "MarkResolved", "RequestMoreInfo", "FinishEpisode",
+    "SelectEmail",
+    "ClassifyEmail",
+    "SetPriority",
+    "ExtractFields",
+    "RouteEmail",
+    "DraftReply",
+    "MarkResolved",
+    "RequestMoreInfo",
+    "FinishEpisode",
 ]
 
 _state: Optional[EpisodeState] = None
 _task_data: Optional[dict] = None
 
 
+def _clamp_open_unit(x: float) -> float:
+    if x <= 0.0:
+        return 0.01
+    if x >= 1.0:
+        return 0.99
+    return round(float(x), 4)
+
+
 def _gold_map() -> dict[str, dict]:
     if _task_data is None:
         return {}
-    return {g["email_id"]: g for g in _task_data.get("gold", [])}
+    return {g["email_id"]: g for g in _task_data.get("gold", []) if "email_id" in g}
 
 
 def reset(task_id: str = "easy") -> Observation:
@@ -48,20 +75,27 @@ def step(action: dict) -> tuple[Observation, float, bool, dict]:
     _state.step += 1
     warnings: list[str] = []
 
-    # Check max steps
     if _state.step >= _state.max_steps:
         _state.done = True
         _state.warnings.append("Max steps reached.")
-        final_score = grade_task(_state, _task_data)
+        final_score = _clamp_open_unit(float(grade_task(_state, _task_data)))
         obs = _build_obs()
-        return obs, 0.0, True, {"final_score": final_score,
-                                 "reward_breakdown": _state.reward_breakdown.model_dump()}
+        return (
+            obs,
+            0.0,
+            True,
+            {
+                "final_score": final_score,
+                "reward_breakdown": _state.reward_breakdown.model_dump(),
+            },
+        )
 
     action_type = action.get("action", "")
-    # Key includes the currently selected email so same action type on a
-    # different email is NOT treated as a repeat.
     selected_ctx = _state.selected_email_id or ""
-    action_key = f"{selected_ctx}:{action_type}:{action.get('category') or action.get('level') or action.get('target_queue') or ''}"
+    action_key = (
+        f"{selected_ctx}:{action_type}:"
+        f"{action.get('category') or action.get('level') or action.get('target_queue') or ''}"
+    )
 
     is_repeat = _state.action_counts.get(action_key, 0) > 0
     _state.action_counts[action_key] = _state.action_counts.get(action_key, 0) + 1
@@ -84,7 +118,8 @@ def step(action: dict) -> tuple[Observation, float, bool, dict]:
     if done:
         _state.done = True
 
-    final_score = grade_task(_state, _task_data) if done else None
+    final_score = _clamp_open_unit(float(grade_task(_state, _task_data))) if done else None
+
     info = {"reward_breakdown": _state.reward_breakdown.model_dump()}
     if final_score is not None:
         info["final_score"] = final_score
@@ -207,9 +242,9 @@ def _apply_action(action: dict, is_repeat: bool, warnings: list[str]) -> dict:
 
 def _build_obs() -> Observation:
     urgent_cats = {"urgent", "phishing"}
-    unread  = sum(1 for e in _state.emails if not e.is_read)
-    urgent  = sum(1 for e in _state.emails if e.assigned_category in urgent_cats)
-    resolved= sum(1 for e in _state.emails if e.is_resolved)
+    unread = sum(1 for e in _state.emails if not e.is_read)
+    urgent = sum(1 for e in _state.emails if e.assigned_category in urgent_cats)
+    resolved = sum(1 for e in _state.emails if e.is_resolved)
 
     selected = _get_selected()
 
@@ -221,8 +256,13 @@ def _build_obs() -> Observation:
             resolved=resolved,
         ),
         email_list=[
-            EmailPreview(id=e.id, subject=e.subject, sender=e.sender,
-                         is_read=e.is_read, is_resolved=e.is_resolved)
+            EmailPreview(
+                id=e.id,
+                subject=e.subject,
+                sender=e.sender,
+                is_read=e.is_read,
+                is_resolved=e.is_resolved,
+            )
             for e in _state.emails
         ],
         selected_email=selected,
