@@ -8,17 +8,25 @@ description: >
 
 tasks:
   - id: easy
+    name: Easy Email Triage
     description: Single-email classification, priority, field extraction, and routing.
     max_steps: 15
     difficulty: easy
+    grader: default
+
   - id: medium
-    description: Triage + constrained reply draft for a portal access issue.
+    name: Medium Email Triage
+    description: Triage plus constrained reply draft for a portal access issue.
     max_steps: 20
     difficulty: medium
+    grader: default
+
   - id: hard
-    description: Multi-email inbox with phishing, spam, duplicates, and step budget pressure.
+    name: Hard Inbox Triage
+    description: Multi-email inbox with phishing, spam, duplicates, and step-budget pressure.
     max_steps: 35
     difficulty: hard
+    grader: default
 
 actions:
   - SelectEmail
@@ -33,13 +41,13 @@ actions:
 
 endpoints:
   reset: POST /reset
-  step:  POST /step
-  state: GET  /state
+  step: POST /step
+  state: GET /state
 
 reward:
   type: shaped
   range: [-1.0, 1.0]
-  final_score_range: [0.0, 1.0]
+  final_score_range: [0.01, 0.99]
 
 runtime:
   port: 7860
