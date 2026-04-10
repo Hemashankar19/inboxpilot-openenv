@@ -10,23 +10,29 @@ tasks:
   - id: easy
     name: Easy Email Triage
     description: Single-email classification, priority, field extraction, and routing.
-    max_steps: 15
     difficulty: easy
-    grader: default
+    max_steps: 15
+    grader:
+      type: deterministic
+      enabled: true
 
   - id: medium
     name: Medium Email Triage
     description: Triage plus constrained reply draft for a portal access issue.
-    max_steps: 20
     difficulty: medium
-    grader: default
+    max_steps: 20
+    grader:
+      type: deterministic
+      enabled: true
 
   - id: hard
     name: Hard Inbox Triage
     description: Multi-email inbox with phishing, spam, duplicates, and step-budget pressure.
-    max_steps: 35
     difficulty: hard
-    grader: default
+    max_steps: 35
+    grader:
+      type: deterministic
+      enabled: true
 
 actions:
   - SelectEmail
