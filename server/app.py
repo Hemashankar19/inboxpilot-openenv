@@ -26,7 +26,10 @@ class GradeRequest(BaseModel):
 
 
 @app.post("/reset")
-def reset(req: ResetRequest = ResetRequest()):
+def reset(req: Optional[ResetRequest] = None):
+    if req is None:
+        req = ResetRequest()
+
     obs = env.reset(req.task_id)
     return {
         "observation": obs.model_dump(),
@@ -48,17 +51,20 @@ def step(req: StepRequest):
 
     return {
         "observation": obs.model_dump(),
-        "reward": reward,
-        "done": done,
+        "reward": float(reward),
+        "done": bool(done),
         "info": info,
     }
 
 
 @app.post("/grade")
-def grade(req: GradeRequest = GradeRequest()):
+def grade(req: Optional[GradeRequest] = None):
     s = env.state()
     if not s:
         raise HTTPException(status_code=400, detail="No active episode. Call /reset first.")
+
+    if req is None:
+        req = GradeRequest()
 
     task_id = req.task_id or s.get("task_id", "easy")
     task_data = load_task(task_id)
@@ -68,6 +74,7 @@ def grade(req: GradeRequest = GradeRequest()):
 
     return {
         "task_id": task_id,
+        "final_score": final_score,
         "result": {
             "final_score": final_score,
         },
@@ -88,6 +95,7 @@ def list_tasks():
 
 
 @app.get("/health")
+@app.post("/health")
 def health():
     return {"status": "ok"}
 
