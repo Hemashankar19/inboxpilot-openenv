@@ -17,11 +17,12 @@ def _extract_id_from_text(text: str, pattern: str) -> bool:
 
 
 def _clamp_open_unit(x: float) -> float:
+    x = float(x)
     if x <= 0.0:
         return 0.01
     if x >= 1.0:
         return 0.99
-    return round(float(x), 4)
+    return round(x, 4)
 
 
 def grade_reply(reply: str, requirements: dict[str, Any]) -> float:
@@ -37,8 +38,7 @@ def grade_reply(reply: str, requirements: dict[str, Any]) -> float:
             if not _has_phrase_from_group(reply, group):
                 score -= per_group
 
-    forbidden = requirements.get("forbidden_phrases", [])
-    for phrase in forbidden:
+    for phrase in requirements.get("forbidden_phrases", []):
         if phrase.lower() in reply.lower():
             score -= 0.3
 
@@ -51,21 +51,21 @@ def grade_reply(reply: str, requirements: dict[str, Any]) -> float:
 
 def grade_email(email: EmailMessage, gold: dict[str, Any]) -> dict[str, float]:
     result: dict[str, float] = {
-        "classification": 0.0,
-        "priority": 0.0,
-        "routing": 0.0,
-        "extraction": 0.0,
-        "reply": 0.0,
+        "classification": 0.01,
+        "priority": 0.01,
+        "routing": 0.01,
+        "extraction": 0.01,
+        "reply": 0.01,
     }
 
-    if gold.get("category") and email.assigned_category == gold["category"]:
-        result["classification"] = 1.0
+    if gold.get("category") is not None:
+        result["classification"] = 0.99 if email.assigned_category == gold["category"] else 0.01
 
-    if gold.get("priority") and email.assigned_priority == gold["priority"]:
-        result["priority"] = 1.0
+    if gold.get("priority") is not None:
+        result["priority"] = 0.99 if email.assigned_priority == gold["priority"] else 0.01
 
-    if gold.get("route") and email.assigned_route == gold["route"]:
-        result["routing"] = 1.0
+    if gold.get("route") is not None:
+        result["routing"] = 0.99 if email.assigned_route == gold["route"] else 0.01
 
     required_fields: dict[str, str] = gold.get("required_fields", {})
     if required_fields:
@@ -74,7 +74,8 @@ def grade_email(email: EmailMessage, gold: dict[str, Any]) -> dict[str, float]:
             for k, v in required_fields.items()
             if str(email.extracted_fields.get(k, "")).strip().lower() == str(v).strip().lower()
         )
-        result["extraction"] = correct / len(required_fields)
+        raw_extraction = correct / len(required_fields)
+        result["extraction"] = _clamp_open_unit(raw_extraction)
 
     reply_reqs = gold.get("reply_requirements")
     if reply_reqs:
@@ -89,7 +90,8 @@ def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
         return 0.5
 
     gold_map: dict[str, dict[str, Any]] = {
-        g["email_id"]: g for g in gold_items if isinstance(g, dict) and "email_id" in g
+        g["email_id"]: g for g in gold_items
+        if isinstance(g, dict) and "email_id" in g
     }
     email_map: dict[str, EmailMessage] = {e.id: e for e in state.emails}
 
@@ -129,12 +131,16 @@ def grade_task(state: EpisodeState, task_data: dict[str, Any]) -> float:
         for dim in active:
             w = float(weights.get(dim, 0.0))
             total_possible += w
-            total_earned += w * float(scores.get(dim, 0.0))
+            total_earned += w * float(scores.get(dim, 0.01))
 
-    raw = 0.5 if total_possible == 0 else (total_earned / total_possible)
+    if total_possible == 0:
+        return 0.5
+
+    raw = total_earned / total_possible
 
     soft_budget = task_data.get("soft_step_budget", state.max_steps)
     over = max(0, state.step - soft_budget)
     penalty = min(over * 0.01, 0.10)
 
-    return _clamp_open_unit(raw - penalty)
+    final = raw - penalty
+    return _clamp_open_unit(final)
