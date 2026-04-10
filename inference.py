@@ -118,9 +118,9 @@ def normalize_step_result(result: Any) -> dict[str, Any]:
     payload = to_dict(result.get("result")) if isinstance(result.get("result"), dict) else result
 
     try:
-        reward = float(payload.get("reward", result.get("reward", 0.0)))
+        reward = float(payload.get("reward", result.get("reward", 0)))
     except Exception:
-        reward = 0.0
+        reward = 0
 
     done = bool(payload.get("done", result.get("done", False)))
     observation = payload.get("observation")
@@ -359,8 +359,8 @@ def choose_action(
 def run(task_id: str) -> dict[str, Any]:
     print(f"[START] task={task_id} model={MODEL_NAME} env={ENV_URL}", flush=True)
 
-    total_reward = 0.0
-    final_score = 0.0
+    total_reward = 0
+    final_score = 0
     history: list[dict[str, str]] = []
     last_action: dict[str, Any] | None = None
     step_n = 0
@@ -402,9 +402,9 @@ def run(task_id: str) -> dict[str, Any]:
 
             if done:
                 try:
-                    final_score = float(info.get("final_score", 0.0))
+                    final_score = float(info.get("final_score", 0))
                 except Exception:
-                    final_score = 0.0
+                    final_score = 0
                 break
 
     except Exception as e:
