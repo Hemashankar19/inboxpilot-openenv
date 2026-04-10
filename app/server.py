@@ -13,6 +13,15 @@ from app.tasks import load_task, list_tasks as _list_tasks
 app = FastAPI(title="InboxPilot-OpenEnv", version="1.0.0")
 
 
+def _safe_score(x: float) -> float:
+    x = float(x)
+    if x <= 0.0:
+        return 0.01
+    if x >= 1.0:
+        return 0.99
+    return round(x, 4)
+
+
 class ResetRequest(BaseModel):
     task_id: str = "easy"
 
@@ -44,14 +53,15 @@ def step(req: StepRequest):
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    safe_reward = _safe_score(reward)
+
     final_score = info.get("final_score")
     if final_score is not None:
-        final_score = max(0.01, min(0.99, float(final_score)))
-        info["final_score"] = final_score
+        info["final_score"] = _safe_score(final_score)
 
     return {
         "observation": obs.model_dump(),
-        "reward": float(reward),
+        "reward": safe_reward,
         "done": bool(done),
         "info": info,
     }
@@ -70,13 +80,15 @@ def grade(req: Optional[GradeRequest] = None):
     task_data = load_task(task_id)
 
     raw_score = grade_task(env._state, task_data)
-    final_score = max(0.01, min(0.99, float(raw_score)))
+    final_score = _safe_score(raw_score)
 
     return {
         "task_id": task_id,
         "final_score": final_score,
+        "score": final_score,
         "result": {
             "final_score": final_score,
+            "score": final_score,
         },
     }
 
