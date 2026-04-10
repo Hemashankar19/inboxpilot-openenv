@@ -1,150 +1,94 @@
-"""Deterministic graders for each task type. No LLM involved."""
+"""Task loader — reads JSON files from data/ and validates structure."""
 from __future__ import annotations
-import re
+
+import json
+import pathlib
 from typing import Any
-from app.models import EmailMessage, EpisodeState
+
+DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
+
+TASK_FILES = {
+    "easy": DATA_DIR / "task_easy.json",
+    "medium": DATA_DIR / "task_medium.json",
+    "hard": DATA_DIR / "task_hard.json",
+}
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+def _validate_task_data(task_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise ValueError(f"{task_id}: task file must contain a JSON object")
 
-def _has_phrase_from_group(text: str, group: list[str]) -> bool:
-    t = text.lower()
-    return any(p.lower() in t for p in group)
+    required_top_level = ["emails", "gold", "goal"]
+    for key in required_top_level:
+        if key not in data:
+            raise ValueError(f"{task_id}: missing required key {key!r}")
 
-def _extract_id_from_text(text: str, pattern: str) -> bool:
-    return bool(re.search(pattern, text, re.I))
+    if not isinstance(data["emails"], list) or not data["emails"]:
+        raise ValueError(f"{task_id}: 'emails' must be a non-empty list")
 
-def _clamp(score: float) -> float:
-    """Clamp to strictly open interval (0.001, 0.999) as required by the checker.
-    Scores of exactly 0.0 or 1.0 are rejected — floor at 0.001, ceil at 0.999."""
-    return round(max(0.001, min(0.999, score)), 4)
+    if not isinstance(data["gold"], list) or not data["gold"]:
+        raise ValueError(f"{task_id}: 'gold' must be a non-empty list")
 
+    email_ids = set()
+    for i, email in enumerate(data["emails"]):
+        if not isinstance(email, dict):
+            raise ValueError(f"{task_id}: email #{i} must be an object")
+        for key in ("id", "subject", "sender", "body"):
+            if key not in email:
+                raise ValueError(f"{task_id}: email #{i} missing key {key!r}")
+        email_ids.add(email["id"])
 
-# ── reply grader (rule-based semantic templates) ──────────────────────────────
+    for i, gold in enumerate(data["gold"]):
+        if not isinstance(gold, dict):
+            raise ValueError(f"{task_id}: gold #{i} must be an object")
+        if "email_id" not in gold:
+            raise ValueError(f"{task_id}: gold #{i} missing 'email_id'")
+        if gold["email_id"] not in email_ids:
+            raise ValueError(
+                f"{task_id}: gold email_id {gold['email_id']!r} not found in emails"
+            )
 
-def grade_reply(reply: str, requirements: dict) -> float:
-    """
-    requirements keys (all optional):
-      required_groups: list[list[str]]  — at least one phrase per group must appear
-      forbidden_phrases: list[str]
-      required_ids: list[str]  — regex patterns that must match
-    Returns score in (0.001, 0.999).
-    """
-    if not reply:
-        return 0.001   # no reply drafted — minimum non-zero score
+    data.setdefault("max_steps", 30)
+    data.setdefault("soft_step_budget", data["max_steps"])
+    data.setdefault(
+        "grader_weights",
+        {
+            "classification": 0.20,
+            "priority": 0.15,
+            "routing": 0.20,
+            "extraction": 0.15,
+            "reply": 0.15,
+            "resolution": 0.15,
+        },
+    )
 
-    score = 1.0
-    groups = requirements.get("required_groups", [])
-    if groups:
-        per_group = 1.0 / len(groups)
-        for group in groups:
-            if not _has_phrase_from_group(reply, group):
-                score -= per_group
-
-    forbidden = requirements.get("forbidden_phrases", [])
-    for phrase in forbidden:
-        if phrase.lower() in reply.lower():
-            score -= 0.3
-
-    for pattern in requirements.get("required_ids", []):
-        if not _extract_id_from_text(reply, pattern):
-            score -= 0.2
-
-    return _clamp(score)
-
-
-# ── per-email grader ──────────────────────────────────────────────────────────
-
-def grade_email(email: EmailMessage, gold: dict) -> dict[str, float]:
-    """Grade a single email against gold standard. Returns component scores."""
-    result: dict[str, float] = {
-        "classification": 0.0,
-        "priority": 0.0,
-        "routing": 0.0,
-        "extraction": 0.0,
-        "reply": 0.0,
-    }
-
-    if gold.get("category") and email.assigned_category == gold["category"]:
-        result["classification"] = 1.0
-
-    if gold.get("priority") and email.assigned_priority == gold["priority"]:
-        result["priority"] = 1.0
-
-    if gold.get("route") and email.assigned_route == gold["route"]:
-        result["routing"] = 1.0
-
-    required_fields: dict[str,str] = gold.get("required_fields", {})
-    if required_fields:
-        correct = sum(
-            1 for k, v in required_fields.items()
-            if email.extracted_fields.get(k, "").strip().lower() == v.strip().lower()
-        )
-        result["extraction"] = correct / len(required_fields)
-
-    reply_reqs = gold.get("reply_requirements")
-    if reply_reqs:
-        result["reply"] = grade_reply(email.draft_reply or "", reply_reqs)
-
-    return result
+    return data
 
 
-# ── task-level graders ────────────────────────────────────────────────────────
+def load_task(task_id: str) -> dict[str, Any]:
+    path = TASK_FILES.get(task_id)
+    if path is None:
+        raise ValueError(f"Unknown task_id: {task_id!r}. Choose from {list(TASK_FILES)}")
 
-def grade_task(state: EpisodeState, task_data: dict) -> float:
-    """
-    Master grader. Returns a score strictly in (0.001, 0.999) as required by
-    the hackathon checker — exact 0.0 and 1.0 are both rejected.
-    task_data["gold"] is a list of gold objects, one per email.
-    """
-    gold_map: dict[str, dict] = {g["email_id"]: g for g in task_data.get("gold", [])}
-    email_map: dict[str, EmailMessage] = {e.id: e for e in state.emails}
+    if not path.exists():
+        raise FileNotFoundError(f"Task file not found for {task_id!r}: {path}")
 
-    if not gold_map:
-        return 0.001   # no gold defined — return minimum rather than 0.0
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    total_possible = 0.0
-    total_earned   = 0.0
-
-    weights = task_data.get("grader_weights", {
-        "classification": 0.20,
-        "priority":       0.15,
-        "routing":        0.25,
-        "extraction":     0.20,
-        "reply":          0.20,
-    })
-
-    for email_id, gold in gold_map.items():
-        email = email_map.get(email_id)
-        if email is None:
-            continue
-        scores = grade_email(email, gold)
-
-        # only count dimensions that are relevant for this email
-        active = {k for k in weights if gold.get(_gold_key(k)) is not None or k in ("extraction","reply")}
-        if not gold.get("reply_requirements"):
-            active.discard("reply")
-        if not gold.get("required_fields"):
-            active.discard("extraction")
-
-        for dim in active:
-            w = weights.get(dim, 0.0)
-            total_possible += w
-            total_earned   += w * scores[dim]
-
-    if total_possible == 0:
-        return 0.001
-
-    raw = total_earned / total_possible
-
-    # efficiency: small penalty per step over soft budget
-    soft_budget = task_data.get("soft_step_budget", state.max_steps)
-    over = max(0, state.step - soft_budget)
-    penalty = min(over * 0.01, 0.10)   # cap at -10%
-
-    return _clamp(raw - penalty)
+    return _validate_task_data(task_id, data)
 
 
-def _gold_key(dim: str) -> str:
-    return {"classification": "category", "priority": "priority",
-            "routing": "route"}.get(dim, dim)
+def list_tasks() -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    for task_id, path in TASK_FILES.items():
+        if path.exists():
+            tasks.append(
+                {
+                    "id": task_id,
+                    "name": f"{task_id.title()} Email Triage",
+                    "difficulty": task_id,
+                    "grader": "app.graders.grade_task",
+                }
+            )
+    return tasks
