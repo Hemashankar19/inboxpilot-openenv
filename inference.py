@@ -4,16 +4,16 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 from typing import Any
 
 import httpx
 
 # ── config ────────────────────────────────────────────────────────────────────
-ENV_URL      = os.getenv("ENV_URL", os.getenv("API_BASE_URL", "http://localhost:7860")).rstrip("/")
-HF_TOKEN     = os.getenv("HF_TOKEN", "")
+# The checker injects API_BASE_URL and API_KEY — use them exactly as-is.
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+API_KEY      = os.getenv("API_KEY", os.getenv("HF_TOKEN", "placeholder"))
 MODEL_NAME   = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://router.huggingface.co/v1")
+ENV_URL      = os.getenv("ENV_URL", "http://localhost:7860").rstrip("/")
 MAX_STEPS    = int(os.getenv("MAX_STEPS", "30"))
 
 # All 3 tasks must run — the checker counts [END] lines and reads score= from each
@@ -120,14 +120,14 @@ def _extract_obs(raw: dict) -> dict:
             return v
     return raw
 
-# ── LLM client (optional) ─────────────────────────────────────────────────────
+# ── LLM client ───────────────────────────────────────────────────────────────
+# Always use API_BASE_URL + API_KEY exactly as the checker injects them.
+# Falls back to heuristic only if the OpenAI package is missing.
 
 def _get_llm():
-    if not HF_TOKEN:
-        return None
     try:
         from openai import OpenAI
-        return OpenAI(base_url=LLM_BASE_URL, api_key=HF_TOKEN)
+        return OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     except Exception:
         return None
 
